@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Beacon Attribution Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --paper:#F6F3EC; --paper-2:#ECE7DA; --ink:#1C2333; --ink-soft:#5B6472;
+    --accent:#2E7D7D; --accent-ink:#0F3F3F; --line:#DAD4C6; --chip-bg:#EAE6DA;
+    --bad:#B5432E; --bad-bg:#F6E4DE; --good:#2E7D7D; --good-bg:#E1EEEC;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#181B20; --paper-2:#20242B; --ink:#ECE9E1; --ink-soft:#A6ACB8;
+      --accent:#7FD4C8; --accent-ink:#DFF7F1; --line:#343946; --chip-bg:#252A33;
+      --bad:#E08669; --bad-bg:#3A2420; --good:#7FD4C8; --good-bg:#1C332F;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#181B20; --paper-2:#20242B; --ink:#ECE9E1; --ink-soft:#A6ACB8;
+    --accent:#7FD4C8; --accent-ink:#DFF7F1; --line:#343946; --chip-bg:#252A33;
+    --bad:#E08669; --bad-bg:#3A2420; --good:#7FD4C8; --good-bg:#1C332F;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:"IBM Plex Sans",system-ui,sans-serif; min-height:100vh;}
+  h1,h2,h3{font-family:"Fraunces",Georgia,serif; margin:0; text-wrap:balance;}
+  .wrap{max-width:1200px; margin:0 auto; padding:2rem clamp(1rem,4vw,2.5rem) 4rem;}
+  header{display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap; margin-bottom:1.6rem;}
+  .kicker{font-family:"IBM Plex Mono",monospace; font-size:0.75rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--accent-ink); background:var(--chip-bg); display:inline-block; padding:0.3em 0.7em; border-radius:3px; margin-bottom:0.6rem;}
+  h1{font-size:clamp(1.6rem,3vw,2.2rem); font-weight:600;}
+  .sub{color:var(--ink-soft); font-size:0.98rem; max-width:640px; margin-top:0.5rem; line-height:1.5;}
+  .netnote{margin-top:0.9rem; font-size:0.85rem; color:var(--accent-ink); background:var(--good-bg); border-radius:6px; padding:0.6em 0.9em; display:inline-block; font-family:"IBM Plex Mono",monospace;}
+
+  .modes{display:flex; gap:0.5rem; background:var(--chip-bg); padding:0.3rem; border-radius:8px;}
+  .modes button{font-family:"IBM Plex Mono",monospace; font-size:0.85rem; border:none; background:transparent; color:var(--ink-soft); padding:0.55em 1em; border-radius:6px; cursor:pointer;}
+  .modes button.active{background:var(--paper); color:var(--ink); font-weight:600; box-shadow:0 1px 2px rgba(0,0,0,0.08);}
+
+  .grid{display:grid; grid-template-columns:1.1fr 1fr; gap:1.5rem; margin-top:1.6rem;}
+  @media (max-width:880px){.grid{grid-template-columns:1fr;}}
+
+  .card{background:var(--paper-2); border:1px solid var(--line); border-radius:10px; padding:1.4rem;}
+  .card h2{font-size:1.05rem; font-weight:600; margin-bottom:0.9rem;}
+  .card .label{font-family:"IBM Plex Mono",monospace; font-size:0.7rem; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-soft); display:block; margin-bottom:0.5rem;}
+
+  .pdp-img{background:var(--chip-bg); border:1px dashed var(--line); border-radius:8px; height:140px; display:flex; align-items:center; justify-content:center; color:var(--ink-soft); font-size:0.85rem; margin-bottom:1rem;}
+  .pdp-title{font-weight:600; margin-bottom:0.2rem;}
+  .pdp-id{font-family:"IBM Plex Mono",monospace; color:var(--ink-soft); font-size:0.82rem; margin-bottom:1rem;}
+  .sizes{display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.4rem;}
+  .sizes button{font-family:"IBM Plex Mono",monospace; border:1px solid var(--line); background:var(--paper); color:var(--ink); border-radius:6px; padding:0.5em 0.9em; cursor:pointer; font-size:0.9rem;}
+  .sizes button.selected{border-color:var(--accent); background:var(--good-bg); color:var(--accent-ink); font-weight:600;}
+  .hint{font-size:0.82rem; color:var(--ink-soft); margin-top:0.6rem; line-height:1.5;}
+
+  #log{font-family:"IBM Plex Mono",monospace; font-size:0.78rem; line-height:1.5; max-height:200px; overflow:auto; background:var(--paper); border:1px solid var(--line); border-radius:6px; padding:0.8rem;}
+  #log .entry{padding:0.4rem 0; border-bottom:1px solid var(--line);}
+  #log .entry:last-child{border-bottom:none;}
+  #log .entry .p{color:var(--accent-ink);}
+  #log .entry .status{float:right; font-size:0.72rem;}
+  #log .entry .status.sending{color:var(--ink-soft);}
+  #log .entry .status.sent{color:var(--good);}
+  #log .entry .status.error{color:var(--bad);}
+  #log .empty{color:var(--ink-soft); font-style:italic;}
+
+  table{width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; font-size:0.92rem;}
+  th{text-align:left; font-family:"IBM Plex Mono",monospace; font-size:0.7rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-soft); font-weight:500; padding-bottom:0.5rem; border-bottom:1px solid var(--line);}
+  td{padding:0.55rem 0.4rem; border-bottom:1px solid var(--line);}
+  tr:last-child td{border-bottom:none;}
+  .pill{display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:0.72rem; padding:0.15em 0.55em; border-radius:3px;}
+  .pill.bad{background:var(--bad-bg); color:var(--bad);}
+  .pill.good{background:var(--good-bg); color:var(--good);}
+
+  .spec{margin-top:1.2rem; font-size:0.88rem; line-height:1.55; color:var(--ink-soft); border-left:3px solid var(--accent); padding-left:0.9rem;}
+  .spec b{color:var(--ink);}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <span class="kicker">Live Demo</span>
+      <h1>Why "0 views, 9 sales" isn't a data bug — it's an attribution bug</h1>
+      <p class="sub">A self-contained reconstruction of the parentId/uid variant-attribution issue. Toggle between the broken and fixed implementation and watch the beacon events and the Products Report react in real time.</p>
+      <div class="netnote">Open DevTools &rarr; Network tab (filter: "post") to see the real outgoing beacon requests — this page fires genuine HTTP POSTs, not just an in-page log.</div>
+    </div>
+    <div class="modes">
+      <button id="btn-broken" class="active">Current (broken)</button>
+      <button id="btn-fixed">Fixed</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Product Detail Page — Trail Runner</h2>
+      <div class="pdp-img">[ product image ]</div>
+      <div class="pdp-title">Trail Runner</div>
+      <div class="pdp-id">parent product id: <b>TR-100</b></div>
+      <span class="label">Select a size</span>
+      <div class="sizes" id="sizes"></div>
+      <p class="hint" id="hint"></p>
+    </div>
+
+    <div class="card">
+      <h2>Beacon event log <span style="font-weight:400; color:var(--ink-soft); font-size:0.8rem;">(real POST requests)</span></h2>
+      <div id="log"><div class="empty">No events yet — load or interact with the PDP.</div></div>
+      <div class="spec">
+        <b>Beacon Tracking spec — Mapping Product Data from API Responses:</b>
+        for products with variants, <code>parentId</code> is always the parent product's identifier, and <code>uid</code> is the specific variant's identifier. They should only be equal when there are no variants.
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:1.5rem;">
+    <h2>Products Report (what the client sees)</h2>
+    <table>
+      <thead><tr><th>Size</th><th>Views</th><th>Sales</th><th>Status</th></tr></thead>
+      <tbody id="report"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  // Real beacon calls fire to httpbin.org's echo endpoint so the browser's
+  // Network tab shows genuine outgoing HTTP POST requests with real payloads.
+  // Requires an internet connection.
+  const BEACON_ENDPOINT = "https://httpbin.org/post";
+
+  const SIZES = ["7","8","9","10"];
+  const SALES = {"7":3,"8":5,"9":9,"10":2}; // fixed — sales attribution was never broken
+  let mode = "broken";
+  let selected = null;
+  let views = {};
+  let log = [];
+
+  function reset(){
+    selected = null;
+    views = {"7":0,"8":0,"9":0,"10":0};
+    log = [];
+  }
+
+  async function sendBeacon(payload, note){
+    const entry = {parentId: payload.parentId, uid: payload.uid, note, status: "sending"};
+    log.push(entry);
+    render();
+    try{
+      const res = await fetch(BEACON_ENDPOINT, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({event: "beacon/pageview", ...payload})
+      });
+      entry.status = res.ok ? "sent (" + res.status + ")" : "error (" + res.status + ")";
+    } catch(err){
+      entry.status = "network error";
+    }
+    render();
+  }
+
+  async function fireInitialPageview(){
+    const payload = {parentId:"TR-100", uid:"TR-100"};
+    await sendBeacon(payload, "page load — no variant pre-selected");
+    if(mode === "broken"){
+      views["7"] += 1; // rolls up to whichever variant Athos happens to map the parent to
+    }
+    render();
+  }
+
+  async function selectSize(size){
+    selected = size;
+    render();
+    if(mode === "broken"){
+      // Bug: selecting a size fires no follow-up event — frontend never tells us what changed
+      return;
+    }
+    const payload = {parentId:"TR-100", uid:"TR-100-"+size};
+    await sendBeacon(payload, "variant selected — updated pageview fired");
+    views[size] += 1;
+    render();
+  }
+
+  async function switchMode(newMode){
+    mode = newMode;
+    reset();
+    render();
+    await fireInitialPageview();
+  }
+
+  function render(){
+    document.getElementById("btn-broken").classList.toggle("active", mode==="broken");
+    document.getElementById("btn-fixed").classList.toggle("active", mode==="fixed");
+
+    const sizesEl = document.getElementById("sizes");
+    sizesEl.innerHTML = "";
+    SIZES.forEach(s => {
+      const b = document.createElement("button");
+      b.textContent = "Size " + s;
+      if(selected === s) b.classList.add("selected");
+      b.onclick = () => { selectSize(s); };
+      sizesEl.appendChild(b);
+    });
+
+    document.getElementById("hint").textContent = mode === "broken"
+      ? "Click a size. Notice: no new request fires in the Network tab — the page never tells the backend which variant the shopper is actually looking at."
+      : "Click a size. Notice: a new POST fires with uid set to the selected variant's own id — check the Network tab.";
+
+    const logEl = document.getElementById("log");
+    logEl.innerHTML = log.length === 0 ? '<div class="empty">No events yet — load or interact with the PDP.</div>' : "";
+    log.forEach(e => {
+      const div = document.createElement("div");
+      div.className = "entry";
+      const statusClass = e.status === "sending" ? "sending" : (e.status && e.status.startsWith("sent") ? "sent" : "error");
+      div.innerHTML = `<div>beacon/pageview <span class="p">— ${e.note}</span><span class="status ${statusClass}">${e.status}</span></div><div>{ parentId: "${e.parentId}", uid: "${e.uid}" }</div>`;
+      logEl.appendChild(div);
+    });
+    logEl.scrollTop = logEl.scrollHeight;
+
+    const reportEl = document.getElementById("report");
+    reportEl.innerHTML = "";
+    SIZES.forEach(s => {
+      const v = views[s], sale = SALES[s];
+      const mismatched = (v === 0 && sale > 0);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>Size ${s}</td><td>${v}</td><td>${sale}</td><td><span class="pill ${mismatched ? 'bad' : 'good'}">${mismatched ? 'no views, sales exist' : 'reconciled'}</span></td>`;
+      reportEl.appendChild(tr);
+    });
+  }
+
+  document.getElementById("btn-broken").onclick = () => switchMode("broken");
+  document.getElementById("btn-fixed").onclick = () => switchMode("fixed");
+
+  reset();
+  render();
+  fireInitialPageview();
+</script>
+</body>
+</html>
