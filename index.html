@@ -86,7 +86,7 @@
       <span class="kicker">Live Demo</span>
       <h1>Why "0 views, 9 sales" isn't a data bug — it's an attribution bug</h1>
       <p class="sub">A self-contained reconstruction of the parentId/uid variant-attribution issue. Toggle between the broken and fixed implementation and watch the beacon events and the Products Report react in real time.</p>
-      <div class="netnote">Real endpoint: <code>POST https://analytics.athoscommerce.net/beacon/v2/{siteId}/product/pageview</code> — payload shape matches the actual Beacon Tracking spec exactly. This demo posts to a safe echo endpoint (httpbin.org) instead of live production infrastructure, so DevTools still shows a genuine outgoing HTTP request. Open DevTools &rarr; Network tab (filter: "post") to see it.</div>
+      <div class="netnote">This fires real requests to the actual Athos Beacon endpoint (demo site <code>atdtdp</code>), with <code>context.dev: true</code> — the documented flag that excludes test traffic from real reporting. Open DevTools &rarr; Network tab (filter: "post") to see the genuine outgoing request.</div>
     </div>
     <div class="modes">
       <button id="btn-broken" class="active">Current (broken)</button>
@@ -125,13 +125,12 @@
 </div>
 
 <script>
-  // Payload bodies match the REAL Athos Beacon Tracking spec exactly:
-  // POST https://analytics.athoscommerce.net/beacon/v2/{siteId}/product/pageview
-  // { context: { timestamp, pageUrl, userId, sessionId, pageLoadId, initiator }, data: { result: { parentId, uid } } }
-  // Requests are sent to a safe echo endpoint (httpbin.org) rather than live
-  // production infrastructure — the payload SHAPE is real, the destination is not.
-  const REAL_ENDPOINT = "https://analytics.athoscommerce.net/beacon/v2/{siteId}/product/pageview";
-  const SAFE_ENDPOINT = "https://httpbin.org/post";
+  // Real Athos Beacon Tracking endpoint, hit against the atdtdp demo site.
+  // context.dev = true is the documented flag for excluding test traffic from
+  // real reporting (Beacon Tracking spec, "Testing" section) — this is the
+  // officially sanctioned way to test against live infrastructure.
+  const DEMO_SITE_ID = "atdtdp";
+  const BEACON_ENDPOINT = `https://analytics.athoscommerce.net/beacon/v2/${DEMO_SITE_ID}/product/pageview`;
 
   const SIZES = ["7","8","9","10"];
   const SALES = {"7":3,"8":5,"9":9,"10":2}; // fixed — sales attribution was never broken
@@ -160,7 +159,8 @@
         userId,
         sessionId,
         pageLoadId,
-        initiator: "athos/demo/1.0"
+        initiator: "athos/demo/1.0",
+        dev: true // excludes this test traffic from real reporting
       },
       data: {
         result: { parentId, uid }
@@ -174,7 +174,7 @@
     log.push(entry);
     render();
     try{
-      const res = await fetch(SAFE_ENDPOINT, {
+      const res = await fetch(BEACON_ENDPOINT, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(body)
