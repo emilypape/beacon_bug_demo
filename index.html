@@ -63,6 +63,8 @@
   #log .entry .status.sent{color:var(--good);}
   #log .entry .status.error{color:var(--bad);}
   #log .empty{color:var(--ink-soft); font-style:italic;}
+  #log .entry pre{margin:0.4rem 0 0; white-space:pre-wrap; word-break:break-all; font-size:0.74rem; color:var(--ink-soft);}
+  #log .entry .endpoint{color:var(--ink); font-weight:600;}
 
   table{width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; font-size:0.92rem;}
   th{text-align:left; font-family:"IBM Plex Mono",monospace; font-size:0.7rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-soft); font-weight:500; padding-bottom:0.5rem; border-bottom:1px solid var(--line);}
@@ -84,7 +86,7 @@
       <span class="kicker">Live Demo</span>
       <h1>Why "0 views, 9 sales" isn't a data bug — it's an attribution bug</h1>
       <p class="sub">A self-contained reconstruction of the parentId/uid variant-attribution issue. Toggle between the broken and fixed implementation and watch the beacon events and the Products Report react in real time.</p>
-      <div class="netnote">Open DevTools &rarr; Network tab (filter: "post") to see the real outgoing beacon requests — this page fires genuine HTTP POSTs, not just an in-page log.</div>
+      <div class="netnote">Real endpoint: <code>POST https://analytics.athoscommerce.net/beacon/v2/{siteId}/product/pageview</code> — payload shape matches the actual Beacon Tracking spec exactly. This demo posts to a safe echo endpoint (httpbin.org) instead of live production infrastructure, so DevTools still shows a genuine outgoing HTTP request. Open DevTools &rarr; Network tab (filter: "post") to see it.</div>
     </div>
     <div class="modes">
       <button id="btn-broken" class="active">Current (broken)</button>
@@ -123,10 +125,13 @@
 </div>
 
 <script>
-  // Real beacon calls fire to httpbin.org's echo endpoint so the browser's
-  // Network tab shows genuine outgoing HTTP POST requests with real payloads.
-  // Requires an internet connection.
-  const BEACON_ENDPOINT = "https://httpbin.org/post";
+  // Payload bodies match the REAL Athos Beacon Tracking spec exactly:
+  // POST https://analytics.athoscommerce.net/beacon/v2/{siteId}/product/pageview
+  // { context: { timestamp, pageUrl, userId, sessionId, pageLoadId, initiator }, data: { result: { parentId, uid } } }
+  // Requests are sent to a safe echo endpoint (httpbin.org) rather than live
+  // production infrastructure — the payload SHAPE is real, the destination is not.
+  const REAL_ENDPOINT = "https://analytics.athoscommerce.net/beacon/v2/{siteId}/product/pageview";
+  const SAFE_ENDPOINT = "https://httpbin.org/post";
 
   const SIZES = ["7","8","9","10"];
   const SALES = {"7":3,"8":5,"9":9,"10":2}; // fixed — sales attribution was never broken
@@ -134,22 +139,45 @@
   let selected = null;
   let views = {};
   let log = [];
+  let pageLoadId = null, sessionId = null, userId = null;
 
   function reset(){
     selected = null;
     views = {"7":0,"8":0,"9":0,"10":0};
     log = [];
+    // Generated once per page load and reused across every event on that page,
+    // per the Context Object Guide.
+    pageLoadId = crypto.randomUUID();
+    sessionId = crypto.randomUUID();
+    userId = crypto.randomUUID();
   }
 
-  async function sendBeacon(payload, note){
-    const entry = {parentId: payload.parentId, uid: payload.uid, note, status: "sending"};
+  function buildEvent(parentId, uid){
+    return {
+      context: {
+        timestamp: new Date().toISOString(),
+        pageUrl: "https://demo-store.example.com/products/trail-runner",
+        userId,
+        sessionId,
+        pageLoadId,
+        initiator: "athos/demo/1.0"
+      },
+      data: {
+        result: { parentId, uid }
+      }
+    };
+  }
+
+  async function sendBeacon(parentId, uid, note){
+    const body = buildEvent(parentId, uid);
+    const entry = {body, note, status: "sending"};
     log.push(entry);
     render();
     try{
-      const res = await fetch(BEACON_ENDPOINT, {
+      const res = await fetch(SAFE_ENDPOINT, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({event: "beacon/pageview", ...payload})
+        body: JSON.stringify(body)
       });
       entry.status = res.ok ? "sent (" + res.status + ")" : "error (" + res.status + ")";
     } catch(err){
@@ -159,8 +187,7 @@
   }
 
   async function fireInitialPageview(){
-    const payload = {parentId:"TR-100", uid:"TR-100"};
-    await sendBeacon(payload, "page load — no variant pre-selected");
+    await sendBeacon("TR-100", "TR-100", "page load — no variant pre-selected");
     if(mode === "broken"){
       views["7"] += 1; // rolls up to whichever variant Athos happens to map the parent to
     }
@@ -174,8 +201,7 @@
       // Bug: selecting a size fires no follow-up event — frontend never tells us what changed
       return;
     }
-    const payload = {parentId:"TR-100", uid:"TR-100-"+size};
-    await sendBeacon(payload, "variant selected — updated pageview fired");
+    await sendBeacon("TR-100", "TR-100-"+size, "variant selected — updated pageview fired");
     views[size] += 1;
     render();
   }
@@ -211,7 +237,7 @@
       const div = document.createElement("div");
       div.className = "entry";
       const statusClass = e.status === "sending" ? "sending" : (e.status && e.status.startsWith("sent") ? "sent" : "error");
-      div.innerHTML = `<div>beacon/pageview <span class="p">— ${e.note}</span><span class="status ${statusClass}">${e.status}</span></div><div>{ parentId: "${e.parentId}", uid: "${e.uid}" }</div>`;
+      div.innerHTML = `<div><span class="endpoint">POST /product/pageview</span> <span class="p">— ${e.note}</span><span class="status ${statusClass}">${e.status}</span></div><pre>${JSON.stringify(e.body, null, 2)}</pre>`;
       logEl.appendChild(div);
     });
     logEl.scrollTop = logEl.scrollHeight;
