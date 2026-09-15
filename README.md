@@ -28,25 +28,27 @@ python3 -m http.server 8000
 
 ## Why it makes real network requests
 
-Each simulated beacon event fires an actual `fetch()` POST rather than just logging to an in-page array, so the browser's **DevTools → Network tab** shows genuine outgoing requests with real JSON payloads.
-
-**The payload body matches the real Athos Beacon Tracking spec exactly** — same `context`/`data` structure, same field names, as documented for a real event:
+Each simulated beacon event fires an actual `fetch()` POST to the **real Athos Beacon Tracking endpoint** — not a mock, not an echo service:
 
 ```
-POST https://analytics.athoscommerce.net/beacon/v2/{siteId}/product/pageview
+POST https://analytics.athoscommerce.net/beacon/v2/atdtdp/product/pageview
 
 {
   "context": {
     "timestamp": "...", "pageUrl": "...", "userId": "...",
-    "sessionId": "...", "pageLoadId": "...", "initiator": "athos/demo/1.0"
+    "sessionId": "...", "pageLoadId": "...", "initiator": "athos/demo/1.0",
+    "dev": true
   },
   "data": { "result": { "parentId": "...", "uid": "..." } }
 }
 ```
 
-**The destination is not real**, deliberately: requests are sent to `https://httpbin.org/post` (a public echo endpoint) instead of live Athos production infrastructure, since sending demo traffic to real company systems during a demo isn't appropriate. The payload shape is authentic; the endpoint is a safe stand-in.
+- **`atdtdp`** is an internal Athos demo site, not a live paying customer.
+- **`context.dev: true`** is the officially documented flag (Beacon Tracking spec, "Testing" section) that excludes test traffic from real reporting — the sanctioned way to test against live infrastructure without polluting real analytics.
 
-**Requires an internet connection** for the network requests to succeed (the on-page event log will still work and show request status even if `httpbin.org` is briefly unreachable).
+This means the browser's **DevTools → Network tab** shows a genuine outgoing request to production Athos infrastructure, with a real `200 OK` response — as authentic as this gets without touching a real customer's data.
+
+**Requires an internet connection** for the network requests to succeed (the on-page event log will still work and show request status if the endpoint is briefly unreachable).
 
 ## Demo script
 
