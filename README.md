@@ -28,7 +28,23 @@ python3 -m http.server 8000
 
 ## Why it makes real network requests
 
-Each simulated beacon event fires an actual `fetch()` POST to `https://httpbin.org/post` (a public echo endpoint) rather than just logging to an in-page array. This means the browser's **DevTools → Network tab** shows genuine outgoing requests with real JSON payloads — useful for a live demo where you want to point at real network activity, not just a mocked-up log.
+Each simulated beacon event fires an actual `fetch()` POST rather than just logging to an in-page array, so the browser's **DevTools → Network tab** shows genuine outgoing requests with real JSON payloads.
+
+**The payload body matches the real Athos Beacon Tracking spec exactly** — same `context`/`data` structure, same field names, as documented for a real event:
+
+```
+POST https://analytics.athoscommerce.net/beacon/v2/{siteId}/product/pageview
+
+{
+  "context": {
+    "timestamp": "...", "pageUrl": "...", "userId": "...",
+    "sessionId": "...", "pageLoadId": "...", "initiator": "athos/demo/1.0"
+  },
+  "data": { "result": { "parentId": "...", "uid": "..." } }
+}
+```
+
+**The destination is not real**, deliberately: requests are sent to `https://httpbin.org/post` (a public echo endpoint) instead of live Athos production infrastructure, since sending demo traffic to real company systems during a demo isn't appropriate. The payload shape is authentic; the endpoint is a safe stand-in.
 
 **Requires an internet connection** for the network requests to succeed (the on-page event log will still work and show request status even if `httpbin.org` is briefly unreachable).
 
